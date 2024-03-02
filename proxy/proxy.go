@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -10,9 +11,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-
-	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 )
 
 type Handler struct {
@@ -60,15 +58,16 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 	curBody := r.Body
 	defer curBody.Close()
 
-	json, err := io.ReadAll(curBody)
+	var payload map[string]any
+	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
-		return fmt.Errorf("reading upstream body: err")
+		return fmt.Errorf("decoding upstream body: err")
 	}
 
 	const acctKey = "acct"
 	// https://docs.joinmastodon.org/entities/Account/#username
-	acct := gjson.GetBytes(json, acctKey).String()
-	if acct == "" {
+	acct, found := payload[acctKey].(string)
+	if !found || acct == "" {
 		return fmt.Errorf("%q not found in response with status %d", acctKey, r.StatusCode)
 	}
 
@@ -77,7 +76,11 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		fakeEmail = acct
 	}
 
-	newBody, err := sjson.SetBytes(json, "fakeEmail", fakeEmail)
+	const fakeEmailKey = "fake_email"
+	payload[fakeEmailKey] = fakeEmail
+
+	newBody := &bytes.Buffer{}
+	err = json.NewEncoder(newBody).Encode(payload)
 	if err != nil {
 		return fmt.Errorf("setting fake email in body: %w", err)
 	}
@@ -85,8 +88,8 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 	log.Printf("Added fakeEmail %q", fakeEmail)
 
 	// For some wicked reason httputil.ReverseProxy does not do this for me.
-	r.Header.Set("content-length", strconv.Itoa(len(newBody)))
+	r.Header.Set("content-length", strconv.Itoa(newBody.Len()))
 
-	r.Body = io.NopCloser(bytes.NewReader(newBody))
+	r.Body = io.NopCloser(newBody)
 	return nil
 }

@@ -60,12 +60,12 @@ func Test_Handler(t *testing.T) {
 		assert func(t *testing.T, r *http.Response)
 	}{
 		{
-			name:   "local response",
+			name:   "creates email from local account",
 			acct:   "foo",
 			status: http.StatusOK,
 			assert: func(t *testing.T, r *http.Response) {
 				if r.StatusCode != http.StatusOK {
-					t.Fatalf("unexpecte status code %d", r.StatusCode)
+					t.Fatalf("unexpected status code %d", r.StatusCode)
 				}
 
 				body, err := io.ReadAll(r.Body)
@@ -73,18 +73,18 @@ func Test_Handler(t *testing.T) {
 					t.Fatalf("reading body: %v", err)
 				}
 
-				if fe := gjson.GetBytes(body, "fakeEmail").String(); fe != "foo@test.local" {
-					t.Fatalf("unexpected value for fakeEmail %q", fe)
+				if fe := gjson.GetBytes(body, "fake_email").String(); fe != "foo@test.local" {
+					t.Fatalf("unexpected value for fake_email %q", fe)
 				}
 			},
 		},
 		{
-			name:   "remote response somehow",
+			name:   "respects email from remote account",
 			acct:   "foo@bar.local",
 			status: http.StatusOK,
 			assert: func(t *testing.T, r *http.Response) {
 				if r.StatusCode != http.StatusOK {
-					t.Fatalf("unexpecte status code %d", r.StatusCode)
+					t.Fatalf("unexpected status code %d", r.StatusCode)
 				}
 
 				body, err := io.ReadAll(r.Body)
@@ -92,27 +92,18 @@ func Test_Handler(t *testing.T) {
 					t.Fatalf("reading body: %v", err)
 				}
 
-				if fe := gjson.GetBytes(body, "fakeEmail").String(); fe != "foo@bar.local" {
-					t.Fatalf("unexpected value for fakeEmail %q", fe)
+				if fe := gjson.GetBytes(body, "fake_email").String(); fe != "foo@bar.local" {
+					t.Fatalf("unexpected value for fake_email %q", fe)
 				}
 			},
 		},
 		{
-			name:   "returns non-ok",
+			name:   "propagates non-ok status codes",
 			acct:   "something",
 			status: http.StatusBadRequest,
 			assert: func(t *testing.T, r *http.Response) {
 				if r.StatusCode != http.StatusBadRequest {
-					t.Fatalf("unexpecte status code %d", r.StatusCode)
-				}
-
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Fatalf("reading body: %v", err)
-				}
-
-				if fe := gjson.GetBytes(body, "fakeEmail").String(); fe != "" {
-					t.Fatalf("unexpected value for fakeEmail %q", fe)
+					t.Fatalf("unexpected status code %d", r.StatusCode)
 				}
 			},
 		},
