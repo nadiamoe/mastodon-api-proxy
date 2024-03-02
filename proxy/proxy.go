@@ -85,7 +85,7 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		return fmt.Errorf("setting fake email in body: %w", err)
 	}
 
-	log.Printf("Added fakeEmail %q", fakeEmail)
+	log.Printf("Added %q:%q", fakeEmailKey, fakeEmail)
 
 	// For some wicked reason httputil.ReverseProxy does not do this for me.
 	r.Header.Set("content-length", strconv.Itoa(newBody.Len()))
