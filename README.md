@@ -18,7 +18,7 @@ On wiki.js:
 
 - Use your usual mastodon url for `Authorization Endpoint URL`, e.g. `https://your.instance/oauth/authorize`
 - Use your usual mastodon url for `Token Endpoint URL`, e.g. `https://owo.cafe/oauth/token`
-- Use the URL of this thing for `User info Endpoint URL`, e.g. `https://api-proxy.your.instance/api/v1/accounts/verify_credentials`
+- Use the URL of this thing for `User info Endpoint URL`, e.g. `https://api-proxy.your.instance/api/v1/accounts/verify_credentials`. It must be an https URL or mastodon will attempt to redirect it to https.
 - As `ID Claim`, `Display Name Claim` and `Email Claim` use `id`, `display_name` and `fake_email` respectively. `fake_email` is what this proxy adds.
 
 On your mastodon instance:
