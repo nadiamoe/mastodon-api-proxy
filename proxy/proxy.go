@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -47,6 +48,7 @@ func New(backendUrl string, domain string) (Handler, error) {
 }
 
 func (h Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL.String())
 	h.proxy.ServeHTTP(rw, r)
 }
 
@@ -79,6 +81,8 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 	if err != nil {
 		return fmt.Errorf("setting fake email in body: %w", err)
 	}
+
+	log.Printf("Added fakeEmail %q", fakeEmail)
 
 	// For some wicked reason httputil.ReverseProxy does not do this for me.
 	r.Header.Set("content-length", strconv.Itoa(len(newBody)))
