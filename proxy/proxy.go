@@ -86,8 +86,7 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		return nil
 	}
 
-	const acctKey = "acct"
-	// https://docs.joinmastodon.org/entities/Account/#username
+	const acctKey = "acct" // https://docs.joinmastodon.org/entities/Account/#acct
 	acct, found := payload[acctKey].(string)
 	if !found || acct == "" {
 		log.Error("key %q not found in response")
