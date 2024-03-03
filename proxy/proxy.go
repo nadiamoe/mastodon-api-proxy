@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -16,6 +18,7 @@ import (
 type Handler struct {
 	proxy  *httputil.ReverseProxy
 	domain string
+	logger *slog.Logger
 }
 
 const verifyCredentialsURL = "/api/v1/accounts/verify_credentials"
@@ -31,9 +34,15 @@ func New(backendUrl string, domain string) (Handler, error) {
 	h := Handler{
 		proxy:  proxy,
 		domain: domain,
+		logger: slog.New(slog.NewTextHandler(os.Stderr, nil)),
 	}
 
 	proxy.ModifyResponse = func(r *http.Response) error {
+		h.logger.With(
+			slog.String("path", r.Request.URL.Path),
+			slog.String("upstream_status", r.Status),
+		).Info("handling response")
+
 		switch r.Request.URL.Path {
 		case verifyCredentialsURL:
 			return h.addFakeEmail(r)
@@ -51,24 +60,38 @@ func (h Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) addFakeEmail(r *http.Response) error {
+	log := h.logger.With(
+		slog.String("path", r.Request.URL.Path),
+		slog.String("upstream_status", r.Status),
+	)
+
+	log.Info("processing verify_credentials request")
+
 	if r.StatusCode != http.StatusOK {
+		log.Warn("forwarding unmodified non-200 response")
 		return nil
 	}
 
-	curBody := r.Body
-	defer curBody.Close()
+	body, err := io.ReadAll(r.Body)
+	r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("reading upstream body: %w", err)
+	}
 
 	var payload map[string]any
-	err := json.NewDecoder(r.Body).Decode(&payload)
+	err = json.Unmarshal(body, &payload)
 	if err != nil {
-		return fmt.Errorf("decoding upstream body: err")
+		log.Error("cannot parse upstream body")
+		return nil
 	}
 
 	const acctKey = "acct"
 	// https://docs.joinmastodon.org/entities/Account/#username
 	acct, found := payload[acctKey].(string)
 	if !found || acct == "" {
-		return fmt.Errorf("%q not found in response with status %d", acctKey, r.StatusCode)
+		log.Error("key %q not found in response")
+		return nil
 	}
 
 	fakeEmail := fmt.Sprintf("%s@%s", acct, h.domain)
@@ -82,10 +105,11 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 	newBody := &bytes.Buffer{}
 	err = json.NewEncoder(newBody).Encode(payload)
 	if err != nil {
-		return fmt.Errorf("setting fake email in body: %w", err)
+		log.Error("couldn't encode modified payload in json: %v", err)
+		return nil
 	}
 
-	log.Printf("Added %q:%q", fakeEmailKey, fakeEmail)
+	log.With(slog.String(fakeEmailKey, fakeEmail)).Info("added fake email")
 
 	// For some wicked reason httputil.ReverseProxy does not do this for me.
 	r.Header.Set("content-length", strconv.Itoa(newBody.Len()))
