@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
@@ -55,7 +54,9 @@ func New(backendUrl string, domain string) (Handler, error) {
 }
 
 func (h Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL.String())
+	h.logger.With(
+		slog.String("path", r.URL.Path),
+	).Info("handling request")
 	h.proxy.ServeHTTP(rw, r)
 }
 
@@ -65,7 +66,7 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		slog.String("upstream_status", r.Status),
 	)
 
-	log.Info("processing verify_credentials request")
+	log.Info("processing verify_credentials response")
 
 	if r.StatusCode != http.StatusOK {
 		log.Warn("forwarding unmodified non-200 response")
