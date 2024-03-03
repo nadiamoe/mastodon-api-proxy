@@ -12,12 +12,12 @@ Run the container. `BACKEND_URL` is expected to point to the real mastodon URL. 
 
 https://github.com/requarks/wiki/discussions/7037
 
-### So how I use this with wiki.js?
+### So how do I use this with wiki.js?
 
 On wiki.js:
 
 - Use your usual mastodon url for `Authorization Endpoint URL`, e.g. `https://your.instance/oauth/authorize`
-- Use your usual mastodon url for `Token Endpoint URL`, e.g. `https://owo.cafe/oauth/token`
+- Use your usual mastodon url for `Token Endpoint URL`, e.g. `https://your.instance/oauth/token`
 - Use the URL of this thing for `User info Endpoint URL`, e.g. `https://api-proxy.your.instance/api/v1/accounts/verify_credentials`. It must be an https URL or mastodon will attempt to redirect it to https.
 - As `ID Claim`, `Display Name Claim` and `Email Claim` use `id`, `display_name` and `fake_email` respectively. `fake_email` is what this proxy adds.
 
