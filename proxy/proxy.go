@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -22,7 +21,7 @@ type Handler struct {
 
 const verifyCredentialsURL = "/api/v1/accounts/verify_credentials"
 
-func New(backendUrl string, domain string) (Handler, error) {
+func New(logger *slog.Logger, backendUrl, domain string) (Handler, error) {
 	u, err := url.Parse(backendUrl)
 	if err != nil {
 		return Handler{}, fmt.Errorf("parsing backend url: %w", err)
@@ -33,14 +32,11 @@ func New(backendUrl string, domain string) (Handler, error) {
 	h := Handler{
 		proxy:  proxy,
 		domain: domain,
-		logger: slog.New(slog.NewTextHandler(os.Stderr, nil)),
+		logger: logger,
 	}
 
 	proxy.ModifyResponse = func(r *http.Response) error {
-		h.logger.With(
-			slog.String("path", r.Request.URL.Path),
-			slog.String("upstream_status", r.Status),
-		).Info("handling response")
+		h.logger.With("path", r.Request.URL.Path, "upstream_status", r.Status).Info("handling response")
 
 		switch r.Request.URL.Path {
 		case verifyCredentialsURL:
@@ -54,17 +50,12 @@ func New(backendUrl string, domain string) (Handler, error) {
 }
 
 func (h Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	h.logger.With(
-		slog.String("path", r.URL.Path),
-	).Info("handling request")
+	h.logger.With("path", r.URL.Path).Info("handling request")
 	h.proxy.ServeHTTP(rw, r)
 }
 
 func (h Handler) addFakeEmail(r *http.Response) error {
-	log := h.logger.With(
-		slog.String("path", r.Request.URL.Path),
-		slog.String("upstream_status", r.Status),
-	)
+	log := h.logger.With("path", r.Request.URL.Path, "upstream_status", r.Status)
 
 	log.Info("processing verify_credentials response")
 
@@ -109,7 +100,7 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		return nil
 	}
 
-	log.With(slog.String(fakeEmailKey, fakeEmail)).Info("added fake email")
+	log.With(fakeEmailKey, fakeEmail).Info("added fake email")
 
 	// For some wicked reason httputil.ReverseProxy does not do this for me.
 	r.Header.Set("content-length", strconv.Itoa(newBody.Len()))

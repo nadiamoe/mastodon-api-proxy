@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"testing"
 
@@ -21,7 +23,11 @@ func Test_Handler(t *testing.T) {
 		backend.Close()
 	})
 
-	proxy, err := proxy.New(backend.URL, "test.local")
+	proxy, err := proxy.New(
+		slog.New(slog.NewTextHandler(os.Stderr, nil)),
+		backend.URL,
+		"test.local",
+	)
 	if err != nil {
 		t.Fatalf("building proxy: %v", err)
 	}

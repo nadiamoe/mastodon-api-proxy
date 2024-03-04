@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -9,15 +9,24 @@ import (
 )
 
 func main() {
-	proxy, err := proxy.New(os.Getenv("BACKEND_URL"), os.Getenv("DOMAIN"))
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+	proxy, err := proxy.New(
+		log,
+		os.Getenv("BACKEND_URL"),
+		os.Getenv("DOMAIN"),
+	)
 	if err != nil {
-		log.Fatalf("building proxy: %v", err)
+		log.Error("building proxy", "error", err)
+		return
 	}
 
 	const addr = ":8080"
-	log.Printf("Starting server on %s", addr)
+	log.Info("Starting server", "address", addr)
+
 	err = http.ListenAndServe(addr, proxy)
 	if err != nil {
-		log.Fatalf("running server: %v", err)
+		log.Error("running server", "error", err)
+		return
 	}
 }
