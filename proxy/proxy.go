@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Handler struct {
@@ -21,6 +22,7 @@ type Handler struct {
 
 type Options struct {
 	Logger *slog.Logger
+	MinAge time.Duration
 }
 
 func (o Options) defaults() Options {
@@ -97,6 +99,15 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		return nil
 	}
 
+	oldEnough, err := isOldEnough(payload["created_at"], h.opts.MinAge)
+	if err != nil {
+		log.Error("checking account age: %v", err)
+	} else if !oldEnough {
+		log.With("account", acct, "created_at", payload["created_at"]).Warn("Account is not old enough, forbiding")
+		r.StatusCode = http.StatusForbidden
+		return nil
+	}
+
 	fakeEmail := fmt.Sprintf("%s@%s", acct, h.domain)
 	if strings.Contains(acct, "@") {
 		fakeEmail = acct
@@ -119,4 +130,22 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 
 	r.Body = io.NopCloser(newBody)
 	return nil
+}
+
+func isOldEnough(createdAtRaw any, threshold time.Duration) (bool, error) {
+	if threshold == 0 {
+		return true, nil
+	}
+
+	createdAtStr, isStr := createdAtRaw.(string)
+	if !isStr {
+		return false, fmt.Errorf("created_at is not a string")
+	}
+
+	createdAt, err := time.Parse(time.RFC3339, createdAtStr)
+	if err != nil {
+		return false, fmt.Errorf("parsing creation time: %w", err)
+	}
+
+	return time.Since(createdAt) > threshold, nil
 }

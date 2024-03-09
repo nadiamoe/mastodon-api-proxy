@@ -8,12 +8,13 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/tidwall/gjson"
 	"roob.re/mastodon-api-proxy/proxy"
 )
 
-func Test_Handler(t *testing.T) {
+func TestProxy(t *testing.T) {
 	t.Parallel()
 
 	backend := httptest.NewServer(fakeMastodon())
@@ -124,6 +125,7 @@ func Test_Handler(t *testing.T) {
 
 			req.Header.Add("acct", tc.acct)
 			req.Header.Add("echo-status", fmt.Sprint(tc.status))
+			req.Header.Add("created-at", "2017-02-08T02:00:53.274Z")
 
 			response, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -131,6 +133,73 @@ func Test_Handler(t *testing.T) {
 			}
 
 			tc.assert(t, response)
+		})
+	}
+}
+
+func TestProxy_MinAge(t *testing.T) {
+	t.Parallel()
+
+	backend := httptest.NewServer(fakeMastodon())
+	t.Cleanup(func() {
+		backend.Close()
+	})
+
+	for _, tc := range []struct {
+		name       string
+		minAge     time.Duration
+		createdAt  time.Time
+		expectCode int
+	}{
+		{
+			name:       "too young",
+			minAge:     2 * time.Hour,
+			createdAt:  time.Now().Add(-1 * time.Hour),
+			expectCode: http.StatusForbidden,
+		},
+		{
+			name:       "old enough",
+			minAge:     2 * time.Hour,
+			createdAt:  time.Now().Add(-3 * time.Hour),
+			expectCode: http.StatusOK,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			proxy, err := proxy.New(
+				backend.URL,
+				"test.local",
+				proxy.Options{
+					MinAge: tc.minAge,
+				},
+			)
+			if err != nil {
+				t.Fatalf("building proxy: %v", err)
+			}
+
+			server := httptest.NewServer(proxy)
+			t.Cleanup(func() {
+				server.Close()
+			})
+
+			req, err := http.NewRequest(http.MethodGet, server.URL+"/api/v1/accounts/verify_credentials", nil)
+			if err != nil {
+				t.Fatalf("creating request: %v", err)
+			}
+
+			req.Header.Add("echo-status", "200")
+			req.Header.Add("acct", tc.name)
+			req.Header.Add("created-at", tc.createdAt.Format(time.RFC3339))
+
+			response, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("making request: %v", err)
+			}
+
+			if response.StatusCode != tc.expectCode {
+				t.Fatalf("expected %d, got %d", tc.expectCode, response.StatusCode)
+			}
 		})
 	}
 }
@@ -155,7 +224,7 @@ func fakeMastodon() http.Handler {
 				"display_name": "infinite love ⴳ",
 				"locked": false,
 				"bot": false,
-				"created_at": "2016-11-24T10:02:12.085Z",
+				"created_at": %q,
 				"note": "<p>i have approximate knowledge of many things. perpetual student. (nb/ace/they)</p><p>xmpp/email: a@trwnh.com<br /><a href=\"https://trwnh.com\" rel=\"nofollow noopener noreferrer\" target=\"_blank\"><span class=\"invisible\">https://</span><span class=\"\">trwnh.com</span><span class=\"invisible\"></span></a><br />help me live: <a href=\"https://liberapay.com/at\" rel=\"nofollow noopener noreferrer\" target=\"_blank\"><span class=\"invisible\">https://</span><span class=\"\">liberapay.com/at</span><span class=\"invisible\"></span></a> or <a href=\"https://paypal.me/trwnh\" rel=\"nofollow noopener noreferrer\" target=\"_blank\"><span class=\"invisible\">https://</span><span class=\"\">paypal.me/trwnh</span><span class=\"invisible\"></span></a></p><p>- my triggers are moths and glitter<br />- i have all notifs except mentions turned off, so please interact if you wanna be friends! i literally will not notice otherwise<br />- dm me if i did something wrong, so i can improve<br />- purest person on fedi, do not lewd in my presence<br />- #1 ami cole fan account</p><p>:fatyoshi:</p>",
 				"url": "https://mastodon.social/@trwnh",
 				"avatar": "https://files.mastodon.social/accounts/avatars/000/014/715/original/34aa222f4ae2e0a9.png",
@@ -166,7 +235,7 @@ func fakeMastodon() http.Handler {
 				"following_count": 178,
 				"statuses_count": 33120,
 				"last_status_at": "2019-11-24T15:49:42.251Z"
-			}`, r.Header.Get("acct"))
+			}`, r.Header.Get("acct"), r.Header.Get("created-at"))
 	})
 
 	return mux
