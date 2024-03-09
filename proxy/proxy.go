@@ -16,12 +16,22 @@ import (
 type Handler struct {
 	proxy  *httputil.ReverseProxy
 	domain string
-	logger *slog.Logger
+	opts   Options
 }
 
-const verifyCredentialsURL = "/api/v1/accounts/verify_credentials"
+type Options struct {
+	Logger *slog.Logger
+}
 
-func New(logger *slog.Logger, backendUrl, domain string) (Handler, error) {
+func (o Options) defaults() Options {
+	o.Logger = slog.Default()
+
+	return o
+}
+
+func New(backendUrl, domain string, opts Options) (Handler, error) {
+	opts = opts.defaults()
+
 	u, err := url.Parse(backendUrl)
 	if err != nil {
 		return Handler{}, fmt.Errorf("parsing backend url: %w", err)
@@ -32,11 +42,13 @@ func New(logger *slog.Logger, backendUrl, domain string) (Handler, error) {
 	h := Handler{
 		proxy:  proxy,
 		domain: domain,
-		logger: logger,
+		opts:   opts,
 	}
 
+	const verifyCredentialsURL = "/api/v1/accounts/verify_credentials"
+
 	proxy.ModifyResponse = func(r *http.Response) error {
-		h.logger.With("path", r.Request.URL.Path, "upstream_status", r.Status).Info("handling response")
+		h.opts.Logger.With("path", r.Request.URL.Path, "upstream_status", r.Status).Info("handling response")
 
 		switch r.Request.URL.Path {
 		case verifyCredentialsURL:
@@ -50,12 +62,12 @@ func New(logger *slog.Logger, backendUrl, domain string) (Handler, error) {
 }
 
 func (h Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	h.logger.With("path", r.URL.Path).Info("handling request")
+	h.opts.Logger.With("path", r.URL.Path).Info("handling request")
 	h.proxy.ServeHTTP(rw, r)
 }
 
 func (h Handler) addFakeEmail(r *http.Response) error {
-	log := h.logger.With("path", r.Request.URL.Path, "upstream_status", r.Status)
+	log := h.opts.Logger.With("path", r.Request.URL.Path, "upstream_status", r.Status)
 
 	log.Info("processing verify_credentials response")
 

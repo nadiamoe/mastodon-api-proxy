@@ -9,12 +9,14 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	log := slog.Default()
 
 	proxy, err := proxy.New(
-		log,
 		os.Getenv("BACKEND_URL"),
 		os.Getenv("DOMAIN"),
+		proxy.Options{
+			Logger: log,
+		},
 	)
 	if err != nil {
 		log.Error("building proxy", "error", err)
