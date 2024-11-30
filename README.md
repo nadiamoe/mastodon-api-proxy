@@ -8,7 +8,9 @@ Every other response, even `Account` responses from other endpoints, are left un
 
 Run the container. `BACKEND_URL` is expected to point to the real mastodon URL. `DOMAIN` is the email domain used to form `fake_email`, in the form of `{acct}@{DOMAIN}`, where `acct` is the `acct` field returned by Mastodon.
 
-Optionally, `MIN_AGE` allows defining a minimum *account* age (time since the account was created, not the age of the person using the account). If defined, requests to `verify_credentials` for accounts below the minimum age will return `403 Forbidden`.
+`MIN_AGE` allows defining a minimum *account* age (time since the account was created, not the age of the person using the account). If defined, requests to `verify_credentials` for accounts below the minimum age will return `403 Forbidden`.
+
+`MAX_STATUS_AGE` allows defining a maximum tolerable time for the account's last post. If defined, requests to `verify_credentials` for accounts whose last post is older than the specified value will return `403 Forbidden`.
 
 ## Why?
 
