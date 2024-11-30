@@ -29,11 +29,11 @@ func main() {
 	if maxStatusAgeStr := os.Getenv("MAX_STATUS_AGE"); maxStatusAgeStr != "" {
 		maxStatusAge, err := time.ParseDuration(maxStatusAgeStr)
 		if err != nil {
-			log.With("MAX_STATUS_AGE", maxStatusAgeStr).Error("parsing MIN_AGE")
+			log.With("MAX_STATUS_AGE", maxStatusAgeStr).Error("parsing MAX_STATUS_AGE")
 			return
 		}
 
-		log.With("maxStatusAge", maxStatusAge).Info("Restricting last status age")
+		log.With("maxStatusAge", maxStatusAge).Info("Restricting max last status age")
 		opts.MaxStatusAge = maxStatusAge
 	}
 
