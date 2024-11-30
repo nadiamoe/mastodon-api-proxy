@@ -101,7 +101,7 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 
 	oldEnough, err := isOldEnough(payload["created_at"], h.opts.MinAge)
 	if err != nil {
-		log.Error("checking account age: %v", err)
+		log.Error("checking account age", "err", err)
 	} else if !oldEnough {
 		log.With("account", acct, "created_at", payload["created_at"]).Warn("Account is not old enough, forbiding")
 		r.StatusCode = http.StatusForbidden
@@ -119,7 +119,7 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 	newBody := &bytes.Buffer{}
 	err = json.NewEncoder(newBody).Encode(payload)
 	if err != nil {
-		log.Error("couldn't encode modified payload in json: %v", err)
+		log.Error("couldn't encode modified payload in json", "err", err)
 		return nil
 	}
 
