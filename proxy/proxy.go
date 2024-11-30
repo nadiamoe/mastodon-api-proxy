@@ -99,18 +99,19 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		return nil
 	}
 
-	oldEnough, err := isOldEnough(payload["created_at"], h.opts.MinAge)
-	if err != nil {
-		log.Error("checking account age", "err", err)
-	} else if !oldEnough {
-		log.With("account", acct, "created_at", payload["created_at"]).Warn("Account is not old enough, forbiding")
+	log = log.With("account", acct)
+
+	if !h.accountOldEnough(log, payload) {
+		log.With("created_at", payload["created_at"]).
+			Warn("Account is not old enough, forbiding")
 		r.StatusCode = http.StatusForbidden
 		return nil
 	}
 
-	fakeEmail := fmt.Sprintf("%s@%s", acct, h.domain)
-	if strings.Contains(acct, "@") {
-		fakeEmail = acct
+	fakeEmail := acct
+	if !strings.Contains(fakeEmail, "@") {
+		// Append domain if account does not include it already.
+		fakeEmail = fmt.Sprintf("%s@%s", fakeEmail, h.domain)
 	}
 
 	const fakeEmailKey = "fake_email"
@@ -132,14 +133,29 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 	return nil
 }
 
-func isOldEnough(createdAtRaw any, threshold time.Duration) (bool, error) {
+func (h Handler) accountOldEnough(log *slog.Logger, payload map[string]any) bool {
+	if h.opts.MinAge == 0 {
+		return true
+	}
+
+	oldEnough, err := timestampOlderThan(payload["created_at"], h.opts.MinAge)
+	if err != nil {
+		log.Error("checking account age using 'created_at'", "err", err)
+		// Something went wrong, default to allow.
+		return true
+	}
+
+	return oldEnough
+}
+
+func timestampOlderThan(timestampRaw any, threshold time.Duration) (bool, error) {
 	if threshold == 0 {
 		return true, nil
 	}
 
-	createdAtStr, isStr := createdAtRaw.(string)
+	createdAtStr, isStr := timestampRaw.(string)
 	if !isStr {
-		return false, fmt.Errorf("created_at is not a string")
+		return false, fmt.Errorf("JSON object is not a string")
 	}
 
 	createdAt, err := time.Parse(time.RFC3339, createdAtStr)
