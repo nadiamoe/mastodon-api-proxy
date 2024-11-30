@@ -15,8 +15,7 @@ func main() {
 		Logger: log,
 	}
 
-	minAgeStr := os.Getenv("MIN_AGE")
-	if minAgeStr != "" {
+	if minAgeStr := os.Getenv("MIN_AGE"); minAgeStr != "" {
 		minAge, err := time.ParseDuration(minAgeStr)
 		if err != nil {
 			log.With("MIN_AGE", minAgeStr).Error("parsing MIN_AGE")
@@ -25,6 +24,17 @@ func main() {
 
 		log.With("minAge", minAge).Info("Restricting account age")
 		opts.MinAge = minAge
+	}
+
+	if maxStatusAgeStr := os.Getenv("MAX_STATUS_AGE"); maxStatusAgeStr != "" {
+		maxStatusAge, err := time.ParseDuration(maxStatusAgeStr)
+		if err != nil {
+			log.With("MAX_STATUS_AGE", maxStatusAgeStr).Error("parsing MIN_AGE")
+			return
+		}
+
+		log.With("maxStatusAge", maxStatusAge).Info("Restricting last status age")
+		opts.MaxStatusAge = maxStatusAge
 	}
 
 	proxy, err := proxy.New(
