@@ -126,6 +126,7 @@ func TestProxy(t *testing.T) {
 			req.Header.Add("acct", tc.acct)
 			req.Header.Add("echo-status", fmt.Sprint(tc.status))
 			req.Header.Add("created-at", "2017-02-08T02:00:53.274Z")
+			req.Header.Add("last-status-at", "2019-11-24T15:49:42.251Z")
 
 			response, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -204,6 +205,73 @@ func TestProxy_MinAge(t *testing.T) {
 	}
 }
 
+func TestProxy_MaxStatusAge(t *testing.T) {
+	t.Parallel()
+
+	backend := httptest.NewServer(fakeMastodon())
+	t.Cleanup(func() {
+		backend.Close()
+	})
+
+	for _, tc := range []struct {
+		name         string
+		maxStatusAge time.Duration
+		createdAt    time.Time
+		expectCode   int
+	}{
+		{
+			name:         "too old",
+			maxStatusAge: 2 * time.Hour,
+			createdAt:    time.Now().Add(-3 * time.Hour),
+			expectCode:   http.StatusForbidden,
+		},
+		{
+			name:         "recent enough",
+			maxStatusAge: 2 * time.Hour,
+			createdAt:    time.Now().Add(-1 * time.Hour),
+			expectCode:   http.StatusOK,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			proxy, err := proxy.New(
+				backend.URL,
+				"test.local",
+				proxy.Options{
+					MaxStatusAge: tc.maxStatusAge,
+				},
+			)
+			if err != nil {
+				t.Fatalf("building proxy: %v", err)
+			}
+
+			server := httptest.NewServer(proxy)
+			t.Cleanup(func() {
+				server.Close()
+			})
+
+			req, err := http.NewRequest(http.MethodGet, server.URL+"/api/v1/accounts/verify_credentials", nil)
+			if err != nil {
+				t.Fatalf("creating request: %v", err)
+			}
+
+			req.Header.Add("echo-status", "200")
+			req.Header.Add("acct", tc.name)
+			req.Header.Add("last-status-at", tc.createdAt.Format(time.RFC3339))
+
+			response, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("making request: %v", err)
+			}
+
+			if response.StatusCode != tc.expectCode {
+				t.Fatalf("expected %d, got %d", tc.expectCode, response.StatusCode)
+			}
+		})
+	}
+}
+
 func fakeMastodon() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/something/else", func(rw http.ResponseWriter, _ *http.Request) {
@@ -234,8 +302,12 @@ func fakeMastodon() http.Handler {
 				"followers_count": 821,
 				"following_count": 178,
 				"statuses_count": 33120,
-				"last_status_at": "2019-11-24T15:49:42.251Z"
-			}`, r.Header.Get("acct"), r.Header.Get("created-at"))
+				"last_status_at": %q
+			}`,
+			r.Header.Get("acct"),
+			r.Header.Get("created-at"),
+			r.Header.Get("last-status-at"),
+		)
 	})
 
 	return mux

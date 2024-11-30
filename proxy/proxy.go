@@ -21,8 +21,9 @@ type Handler struct {
 }
 
 type Options struct {
-	Logger *slog.Logger
-	MinAge time.Duration
+	Logger       *slog.Logger
+	MinAge       time.Duration
+	MaxStatusAge time.Duration
 }
 
 func (o Options) defaults() Options {
@@ -108,6 +109,13 @@ func (h Handler) addFakeEmail(r *http.Response) error {
 		return nil
 	}
 
+	if !h.accountPostsEnough(log, payload) {
+		log.With("account", acct, "last_status_at", payload["last_status_at"]).
+			Warn("Account last post is too old, forbidding")
+		r.StatusCode = http.StatusForbidden
+		return nil
+	}
+
 	fakeEmail := acct
 	if !strings.Contains(fakeEmail, "@") {
 		// Append domain if account does not include it already.
@@ -146,6 +154,21 @@ func (h Handler) accountOldEnough(log *slog.Logger, payload map[string]any) bool
 	}
 
 	return oldEnough
+}
+
+func (h Handler) accountPostsEnough(log *slog.Logger, payload map[string]any) bool {
+	if h.opts.MaxStatusAge == 0 {
+		return true
+	}
+
+	lastPostTooOld, err := timestampOlderThan(payload["last_status_at"], h.opts.MaxStatusAge)
+	if err != nil {
+		log.Error("checking account last post using 'last_status_at'", "err", err)
+		// Something went wrong, default to allow.
+		return true
+	}
+
+	return !lastPostTooOld
 }
 
 func timestampOlderThan(timestampRaw any, threshold time.Duration) (bool, error) {
