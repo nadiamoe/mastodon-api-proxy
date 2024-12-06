@@ -4,6 +4,6 @@ WORKDIR /proxy
 COPY . .
 RUN go build -o /bin/proxy .
 
-FROM alpine:3.20.3
+FROM alpine:3.21.0
 COPY --from=builder /bin/proxy /usr/local/bin/
 ENTRYPOINT [ "/usr/local/bin/proxy" ]
