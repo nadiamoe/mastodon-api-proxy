@@ -2,7 +2,7 @@ module roob.re/mastodon-api-proxy
 
 go 1.23
 
-require github.com/tidwall/gjson v1.19.0
+require github.com/tidwall/gjson v1.20.0
 
 require (
 	github.com/tidwall/match v1.1.1 // indirect
