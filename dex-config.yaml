@@ -1,0 +1,27 @@
+issuer: https://oidc.your.instance
+
+staticClients:
+  - name: owowiki
+    id: "{{ .Env.OWOWIKI_CLIENT_ID }}"
+    secret: "{{ .Env.OWOWIKI_CLIENT_SECRET }}"
+    redirectURIs:
+      - "{{ .Env.OWOWIKI_REDIRECT_URI }}"
+
+connectors:
+  - type: oauth
+    id: your.instance
+    name: your.instance
+    config:
+      clientID: "{{ .Env.UPSTREAM_CLIENT_ID }}"
+      clientSecret: "{{ .Env.UPSTREAM_CLIENT_SECRET }}"
+      redirectURI: https://oidc.your.instance/callback
+      authorizationURL: https://your.instance/oauth/authorize
+      tokenURL: https://your.instance/oauth/token
+      userInfoURL: https://your.instance/api/v1/accounts/verify_credentials
+      scopes:
+        - profile
+      userIDKey: id
+      claimMapping:
+        userNameKey: username
+        preferredUsernameKey: display_name
+        emailKey: fake_email
